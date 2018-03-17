@@ -1,17 +1,19 @@
 //Random numbers library
 import java.util.Random;
-//JavaFx UI
+//JavaFx UI and elements
 import javafx.application.Application;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.scene.control.Button;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.Group;
 import javafx.scene.paint.PhongMaterial;
 import javafx.scene.Scene;
-import javafx.scene.layout.StackPane;
 import javafx.scene.paint.*;
 import javafx.scene.shape.CullFace;
 import javafx.scene.shape.Sphere;
+import javafx.scene.text.Text;
+import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
 class Colors {
@@ -23,6 +25,10 @@ class Colors {
 	    int pick = new Random().nextInt(Color.values().length);
 	    return Color.values()[pick];
 	}
+}
+
+class GameParameters {
+	int tentative;
 }
 
 public class MasterMind extends Application {
@@ -82,14 +88,11 @@ public class MasterMind extends Application {
 
 	@Override
 	public void start(Stage arg0) throws Exception {
-		//Button btn = new Button("Hello");
-		//btn.setOnAction(new EventHandler<ActionEvent>() {
-		//	public void handle (ActionEvent event) {
-		//		System.out.println("Hellow");
-		//	}
-		//});
 		int gameRows = 10;
 		int gameColumns = 4;
+		int possibleColors = 6;
+		GameParameters param = new GameParameters();
+		param.tentative = 0;
 
 		Group root = new Group();
 		Sphere[][] grid = new Sphere[gameRows][gameColumns];
@@ -111,6 +114,128 @@ public class MasterMind extends Application {
 		    grid[0][j].setMaterial(material);
 			grid[0][j].setCullFace(CullFace.BACK);
 		}
+		
+		Sphere[] userProposition = new Sphere[gameColumns];
+		for (int i = 0; i < gameColumns; i++) {
+			Sphere emptySphere = new Sphere();
+		    emptySphere.setRadius(40.0);
+		    emptySphere.setCullFace(CullFace.FRONT);
+		    emptySphere.setTranslateX(400+110*i);
+		    emptySphere.setTranslateY(50);
+		    root.getChildren().add(emptySphere);
+			userProposition[i] = emptySphere;
+		}
+		Sphere[][] userChoices = new Sphere[possibleColors][gameColumns];
+		for (int i = 0; i < possibleColors; i++) {
+			for (int j = 0; j < gameColumns; j++) {
+			    Sphere emptySphere = new Sphere();
+			    emptySphere.setRadius(20.0);
+			    emptySphere.setCullFace(CullFace.BACK);
+			    if ((i % 2) == 0) {
+			    	emptySphere.setTranslateX(375+110*j);
+				    emptySphere.setTranslateY(125+25*i);
+			    } else {
+			    	emptySphere.setTranslateX(425+110*j);
+				    emptySphere.setTranslateY(125+25*(i-1));
+			    }
+			    //emptySphere.setTranslateX(400+100*j);
+			    //emptySphere.setTranslateY(150+50*i);
+			    PhongMaterial material = new PhongMaterial();
+			    material.setSpecularColor(Color.BLACK);
+			    switch (i) {
+	            case 0:  material.setDiffuseColor(Color.RED);
+	                    break;
+	            case 1:  material.setDiffuseColor(Color.YELLOW);
+                		break;
+	            case 2:  material.setDiffuseColor(Color.BLUE);
+                		break;
+	            case 3:  material.setDiffuseColor(Color.ORANGE);
+                		break;
+	            case 4:  material.setDiffuseColor(Color.GREEN);
+                		break;
+	            case 5:  material.setDiffuseColor(Color.BLACK);
+	            		material.setSpecularColor(Color.WHITE);
+                		break;
+			    }
+			    emptySphere.setMaterial(material);
+			    emptySphere.setCullFace(CullFace.BACK);
+			    switch (j) {
+	            case 0:  emptySphere.setOnMouseClicked(event -> {
+					userProposition[0].setCullFace(CullFace.BACK);
+					userProposition[0].setMaterial(material);
+				});
+	                    break;
+	            case 1:  emptySphere.setOnMouseClicked(event -> {
+					userProposition[1].setCullFace(CullFace.BACK);
+					userProposition[1].setMaterial(material);
+				});
+                		break;
+	            case 2:  emptySphere.setOnMouseClicked(event -> {
+					userProposition[2].setCullFace(CullFace.BACK);
+					userProposition[2].setMaterial(material);
+				});
+                		break;
+	            case 3:  emptySphere.setOnMouseClicked(event -> {
+					userProposition[3].setCullFace(CullFace.BACK);
+					userProposition[3].setMaterial(material);
+				});
+                		break;
+			    }
+			    root.getChildren().add(emptySphere);
+				userChoices[i][j] = emptySphere;
+			}
+		}
+		Sphere[][] userFeedback = new Sphere[gameRows][gameColumns];
+		for (int i = 0; i < gameRows; i++) {
+			for (int j = 0; j < gameColumns; j++) {
+			    Sphere emptySphere = new Sphere();
+			    emptySphere.setRadius(5.0);
+			    emptySphere.setCullFace(CullFace.FRONT);
+			    emptySphere.setTranslateX(240+(j % 2)*20);
+			    if (j >= 2) {
+			    	emptySphere.setTranslateY(60 + 50*i);
+			    } else {
+			    	emptySphere.setTranslateY(40 + 50*i);
+			    }
+			    PhongMaterial material = new PhongMaterial();
+			    material.setSpecularColor(Color.BLACK);
+			    material.setDiffuseColor(Color.RED);
+			    emptySphere.setMaterial(material);
+			    root.getChildren().add(emptySphere);
+			    userFeedback[i][j] = emptySphere;
+			}
+		}
+		Button btn = new Button("Confirm your selection");
+		btn.setTranslateX(500);
+		btn.setTranslateY(275);
+		btn.setOnAction(new EventHandler<ActionEvent>() {
+			public void handle (ActionEvent event) {
+				for (int j = 0; j < gameColumns; j++) {
+				    grid[param.tentative][j].setMaterial(userProposition[j].getMaterial());
+					grid[param.tentative][j].setCullFace(CullFace.BACK);
+				}
+				param.tentative++;
+				if (param.tentative >= 10) {
+					DropShadow ds = new DropShadow();
+					ds.setOffsetY(3.0f);
+					ds.setColor(Color.color(0.4f, 0.4f, 0.4f));
+
+					Text t = new Text("Game Over");
+					t.setEffect(ds);
+					t.setCache(true);
+					t.setFont(Font.font ("Verdana", 80));
+					t.setFill(Color.RED);
+					t.setX(300);
+					t.setY(550);
+					root.getChildren().add(t);
+				}
+			}
+		});
+		root.getChildren().add(btn);
+		
+		//userChoices[0][0].setOnMouseClicked(event -> {
+		//		userProposition[1].setCullFace(CullFace.BACK);
+		//});
 		
 		Scene scene = new Scene(root, 800, 600);
 		arg0.setTitle("MasterMind");
