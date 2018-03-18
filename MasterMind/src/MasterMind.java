@@ -11,23 +11,42 @@ import javafx.scene.paint.PhongMaterial;
 import javafx.scene.Scene;
 import javafx.scene.paint.*;
 import javafx.scene.shape.CullFace;
+import javafx.scene.shape.Rectangle;
 import javafx.scene.shape.Sphere;
 import javafx.scene.text.Text;
 import javafx.scene.text.Font;
 import javafx.stage.Stage;
 
-class Colors {
-	// Define a set of available colors
-	enum Color {R, J, B, O, V, N}
-	Color color;
+class ColorManager {
+	enum Colors {R, J, B, O, V, N}
+	Colors color;
 	// Select a random color
-	static Color randomColor() {
-	    int pick = new Random().nextInt(Color.values().length);
-	    return Color.values()[pick];
+	static Colors randomColor() {
+	    int pick = new Random().nextInt(Colors.values().length);
+	    return Colors.values()[pick];
+	}
+	Color retrieveColor(Colors colorletter) {
+		Color c = Color.WHITE;
+		switch (colorletter) {
+    		case R:  c = Color.RED;
+            	break;
+    		case J:  c = Color.YELLOW;
+        		break;
+    		case B:  c = Color.BLUE;
+        		break;
+    		case O:  c = Color.ORANGE;
+        		break;
+    		case V:  c = Color.GREEN;
+        		break;
+    		case N:  c = Color.BLACK;
+        		break;
+		}
+		return c;
 	}
 }
 
 class GameParameters {
+	boolean winner;
 	int tentative;
 	int gameRows;
 	int gameColumns;
@@ -37,24 +56,25 @@ class GameParameters {
 	String gameTitle;
 	
 	void initParameters() {
+		winner = false;
 		tentative = 0;
 		gameRows = 10;
 		gameColumns = 4;
 		possibleColors = 6;
 		screenWidth = 800;
 		screenHeight = 600;
-		gameTitle = "MasterMind Game - Gonzague Leruth\'s Premium Edition";
+		gameTitle = "MasterMind Game - Gonzague Leruth\'s Edition";
 	}
 }
 
 class ComputerSelectionManager {
-	Colors[] computerSelection;
+	ColorManager[] computerSelection;
 	// Create a computer random selection of colors
-	Colors[] createComputerSelection() {
-		computerSelection = new Colors[4];
+	ColorManager[] createComputerSelection() {
+		computerSelection = new ColorManager[4];
 		for (int i = 0; i < computerSelection.length; i++) {
-			Colors color = new Colors();
-			color.color = Colors.randomColor();
+			ColorManager color = new ColorManager();
+			color.color = ColorManager.randomColor();
 			computerSelection[i] = color;
 			System.out.println(computerSelection[i].color);
 		}
@@ -67,6 +87,7 @@ class PlaceSphereManager{
 	Sphere placeSphere(Group root, double radius, boolean visible, int x, int y) {
 		Sphere sphere = new Sphere();
 	    sphere.setRadius(radius);
+	    assignColor(Color.WHITE, sphere);
 	    if (visible) {
 	    	sphere.setCullFace(CullFace.BACK);
 	    } else {
@@ -188,14 +209,15 @@ class PickGridManager{
 }
 
 class ExtraUIElementsManager{
-	void addExtraUIElements(Group root, GameParameters param, Sphere[][] gameGrid, Sphere[] userSelectionLine){
+	// Extra UI elements such as button, and win/lose management
+	void addExtraUIElements(Group root, GameParameters param, Sphere[][] gameGrid, Sphere[] userSelectionLine, ColorManager[] computerSelection, Sphere[][] scoreGrid){
 		Button btn = new Button("Confirm your selection");
 		btn.setTranslateX(500);
 		btn.setTranslateY(275);
 		btn.setOnAction(new EventHandler<ActionEvent>() {
 			public void handle (ActionEvent event) {
 				TentativeManager tentativeManager = new TentativeManager();
-				tentativeManager.newTentative(root, param, gameGrid, userSelectionLine);
+				tentativeManager.newTentative(root, param, gameGrid, userSelectionLine, computerSelection, scoreGrid);
 			}
 		});
 		root.getChildren().add(btn);
@@ -203,22 +225,119 @@ class ExtraUIElementsManager{
 }
 
 class TentativeManager{
-	void newTentative(Group root, GameParameters param, Sphere[][] gameGrid, Sphere[] userSelectionLine) {
+	void newTentative(Group root, GameParameters param, Sphere[][] gameGrid, Sphere[] userSelectionLine, ColorManager[] computerSelection, Sphere[][] scoreGrid) {
 		if (param.tentative < 10) {
 			// if enough attempts left
-			// check validity
+			// check validity of user selection
+			boolean validity = true;
+			boolean validity2 = true;
+			boolean validity3 = true;
+			boolean[] sameAsLastTentative = {true, true, true, true};
 			for (int j = 0; j < param.gameColumns; j++) {
-				// TO CONTINUE
+				// First validity criterion: all colors of the user proposition have been assigned
+				if (((PhongMaterial) userSelectionLine[j].getMaterial()).getDiffuseColor() == Color.WHITE) {
+					validity = false;
+				};
+				// Second validity criterion: the proposition is different from the last one
+				if (param.tentative > 0) {
+					sameAsLastTentative[j] = (((PhongMaterial) userSelectionLine[j].getMaterial()).getDiffuseColor() == ((PhongMaterial) gameGrid[param.tentative - 1][j].getMaterial()).getDiffuseColor());
+					validity2 = validity2 && sameAsLastTentative[j];
+					validity3 = !validity2;
+				}
 			}
+			validity = validity && validity3;
 			// and take new user proposition into account
-			for (int j = 0; j < param.gameColumns; j++) {
-				gameGrid[param.tentative][j].setMaterial(userSelectionLine[j].getMaterial());
-				gameGrid[param.tentative][j].setCullFace(CullFace.BACK);
+			if (validity) {
+				for (int j = 0; j < param.gameColumns; j++) {
+					gameGrid[param.tentative][j].setMaterial(userSelectionLine[j].getMaterial());
+					gameGrid[param.tentative][j].setCullFace(CullFace.BACK);
+				}
+				param.tentative++;
 			}
-			param.tentative++;
+			// Compare user selection with computer selection
+			// Check matching colors
+			int sameColorsAndPlace = 0;
+			for (int i = 0; i < param.gameColumns; i++) {
+				if (((PhongMaterial) userSelectionLine[i].getMaterial()).getDiffuseColor() == computerSelection[i].retrieveColor(computerSelection[i].color)) {
+					sameColorsAndPlace++;
+				}
+			}
+			// Check colors similarities
+			int sameColors = 0;
+			int[] userColorsCounts = {0, 0, 0, 0, 0, 0};
+			int[] computerColorsCounts = {0, 0, 0, 0, 0, 0};
+			for (int i = 0; i < param.gameColumns; i++) {
+				if (((PhongMaterial) userSelectionLine[i].getMaterial()).getDiffuseColor() == Color.RED){
+					userColorsCounts[0]++;
+				}
+				if (((PhongMaterial) userSelectionLine[i].getMaterial()).getDiffuseColor() == Color.YELLOW){
+					userColorsCounts[1]++;
+				}
+				if (((PhongMaterial) userSelectionLine[i].getMaterial()).getDiffuseColor() == Color.BLUE){
+					userColorsCounts[2]++;
+				}
+				if (((PhongMaterial) userSelectionLine[i].getMaterial()).getDiffuseColor() == Color.ORANGE){
+					userColorsCounts[3]++;
+				}
+				if (((PhongMaterial) userSelectionLine[i].getMaterial()).getDiffuseColor() == Color.GREEN){
+					userColorsCounts[4]++;
+				}
+				if (((PhongMaterial) userSelectionLine[i].getMaterial()).getDiffuseColor() == Color.BLACK){
+					userColorsCounts[5]++;
+				}
+				if (computerSelection[i].retrieveColor(computerSelection[i].color) == Color.RED){
+					computerColorsCounts[0]++;
+				}
+				if (computerSelection[i].retrieveColor(computerSelection[i].color) == Color.YELLOW){
+					computerColorsCounts[1]++;
+				}
+				if (computerSelection[i].retrieveColor(computerSelection[i].color) == Color.BLUE){
+					computerColorsCounts[2]++;
+				}
+				if (computerSelection[i].retrieveColor(computerSelection[i].color) == Color.ORANGE){
+					computerColorsCounts[3]++;
+				}
+				if (computerSelection[i].retrieveColor(computerSelection[i].color) == Color.GREEN){
+					computerColorsCounts[4]++;
+				}
+				if (computerSelection[i].retrieveColor(computerSelection[i].color) == Color.BLACK){
+					computerColorsCounts[5]++;
+				}
+			}			
+			for (int i = 0; i < 6; i++) {
+				if ((userColorsCounts[i] > 0) && (computerColorsCounts[i] > 0)) {
+					int count = Math.min(computerColorsCounts[i], userColorsCounts[i]);
+					sameColors = sameColors + count;
+				}
+			}
+			// Update score grid
+			for (int i = 0; i < sameColorsAndPlace; i++) {
+				PlaceSphereManager placeSphereManager = new PlaceSphereManager();
+				placeSphereManager.assignColor(Color.RED, scoreGrid[param.tentative - 1][i]);
+			}
+			for (int i = 0; i < sameColors - sameColorsAndPlace; i++) {
+				PlaceSphereManager placeSphereManager = new PlaceSphereManager();
+				placeSphereManager.assignColor(Color.WHITE, scoreGrid[param.tentative - 1][i + sameColorsAndPlace]);
+			}
+			// Declare winner
+			if (sameColorsAndPlace == 4) {
+				DropShadow ds = new DropShadow();
+				ds.setOffsetY(3.0f);
+				ds.setColor(Color.color(0.4f, 0.4f, 0.4f));
+				Text t = new Text("Winner");
+				t.setEffect(ds);
+				t.setCache(true);
+				t.setFont(Font.font ("Verdana", 80));
+				t.setFill(Color.GREEN);
+				t.setX(300);
+				t.setY(550);
+				root.getChildren().add(t);
+				param.winner = true;
+				param.tentative = 10;
+			}
 		}
-		else {
-			// otherwise, display game over text
+		else if (!param.winner) {
+			// otherwise, display "game over" text
 			DropShadow ds = new DropShadow();
 			ds.setOffsetY(3.0f);
 			ds.setColor(Color.color(0.4f, 0.4f, 0.4f));
@@ -235,7 +354,7 @@ class TentativeManager{
 }
 
 class UIElementsManager{
-	void positionUIElements(Group root, GameParameters param, Colors[] computerSelection) {
+	void positionUIElements(Group root, GameParameters param, ColorManager[] computerSelection) {
 		// Game grid
 		GameGridManager gameGridManager = new GameGridManager();
 		Sphere[][] grid = gameGridManager.createGameGrid(root, param);
@@ -250,63 +369,48 @@ class UIElementsManager{
 		Sphere[][] pickGrid = pickGridManager.createPickGrid(root, param, userSelectionLine);
 		// Extra UI elements
 		ExtraUIElementsManager extraUIelementsManager = new ExtraUIElementsManager();
-		extraUIelementsManager.addExtraUIElements(root, param, grid, userSelectionLine);
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
+		extraUIelementsManager.addExtraUIElements(root, param, grid, userSelectionLine, computerSelection, scoreGrid);
 		
 		//Create a random Color
-		Colors color = new Colors();
-		color.color = Colors.randomColor();
-				//User chooses colors
-				Colors[] userSelection;
-				userSelection = new Colors[4];
-				userSelection[0] = color;
-				userSelection[1] = color;
-				userSelection[2] = color;
-				userSelection[3] = color;
-				//Compute how many colors are correct
-				int correctScore = 0;
-				for (int i = 0; i < computerSelection.length; i++) {
-					for (int j = 0; j < userSelection.length; j++) {
-						if (computerSelection[i] == userSelection[j]) {
-							correctScore++;
-						}
-					}
-				}
-				//Compute how many colors are correct and at the right place
-				int correctPlace = 0;
-				for (int i = 0; i < computerSelection.length; i++) {
-					if (computerSelection[i] == userSelection[i]) {
-						correctPlace++;
-					}
-				}
-				//Display status on console
-				String consoleResult = "";
-				consoleResult = "|";
-				for (int i = 0; i < userSelection.length; i++) {
-					consoleResult += userSelection[i].color;
-				}
-				consoleResult += "| ";
-				consoleResult += Integer.toString(correctScore);
-				consoleResult += " | ";
-				consoleResult += Integer.toString(correctPlace);
-				consoleResult += " | ";
-				consoleResult += Integer.toString(1);
-				consoleResult += "/10 | ";
-				System.out.println(consoleResult);
-		
-		
-		
-		
+//		ColorManager color = new ColorManager();
+//		color.color = ColorManager.randomColor();
+		//User chooses colors
+//		ColorManager[] userSelection;
+//		userSelection = new ColorManager[4];
+//		userSelection[0] = color;
+//		userSelection[1] = color;
+//		userSelection[2] = color;
+//		userSelection[3] = color;
+		//Compute how many colors are correct
+//		int correctScore = 0;
+//		for (int i = 0; i < computerSelection.length; i++) {
+//			for (int j = 0; j < userSelection.length; j++) {
+//				if (computerSelection[i] == userSelection[j]) {
+//					correctScore++;
+//				}
+//			}
+//		}
+		//Compute how many colors are correct and at the right place
+//		int correctPlace = 0;
+//		for (int i = 0; i < computerSelection.length; i++) {
+//			if (computerSelection[i] == userSelection[i]) {
+//				correctPlace++;
+//			}
+//		}
+		//Display status on console
+//		String consoleResult = "";
+//		consoleResult = "|";
+//		for (int i = 0; i < userSelection.length; i++) {
+//			consoleResult += userSelection[i].color;
+//		}
+//		consoleResult += "| ";
+//		consoleResult += Integer.toString(correctScore);
+//		consoleResult += " | ";
+//		consoleResult += Integer.toString(correctPlace);
+//		consoleResult += " | ";
+//		consoleResult += Integer.toString(1);
+//		consoleResult += "/10 | ";
+//		System.out.println(consoleResult);	
 	}
 }
 
@@ -318,7 +422,7 @@ class MainScreenManager{
 		
 		// Create the computer selection of colors
 		ComputerSelectionManager computerSelectionManager = new ComputerSelectionManager();
-		Colors[] computerSelection = computerSelectionManager.createComputerSelection();
+		ColorManager[] computerSelection = computerSelectionManager.createComputerSelection();
 		
 		// Set the screen
 		Group root = new Group();
